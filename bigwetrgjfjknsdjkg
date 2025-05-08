@@ -186,7 +186,7 @@ Title.Size = UDim2.new(0.8, 0, 0, 30)
 Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 Title.Text = "ESP Control Panel"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 16
+Title.TextSize = 14
 Title.Font = Enum.Font.SourceSansBold
 Title.Parent = Frame
 
