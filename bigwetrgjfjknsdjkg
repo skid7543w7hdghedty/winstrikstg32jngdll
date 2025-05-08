@@ -1,0 +1,338 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+
+-- ESP Settings
+local ESP_ENABLED = true
+local HIGHLIGHT_ENABLED = true
+local HEALTHBAR_ENABLED = true
+local INFO_ENABLED = true
+
+-- Function to create ESP for an NPC
+local function createESP(entity)
+    if entity ~= LocalPlayer.Character and entity then
+        local humanoid = entity:FindFirstChildOfClass("Humanoid")
+        local rootPart = entity:FindFirstChild("HumanoidRootPart") or entity:FindFirstChild("Torso")
+        
+        if humanoid and rootPart then
+            -- Create Highlight
+            if HIGHLIGHT_ENABLED then
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "ESP"
+                highlight.FillColor = Color3.fromRGB(255, 0, 0)
+                highlight.OutlineColor = Color3.fromRGB(0, 0, 255)
+                highlight.FillTransparency = 0.7
+                highlight.OutlineTransparency = 0
+                highlight.Adornee = entity
+                highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                highlight.Parent = entity
+            end
+
+            -- Create BillboardGui for health bar
+            if HEALTHBAR_ENABLED then
+                local healthBarGui = Instance.new("BillboardGui")
+                healthBarGui.Name = "HealthBar"
+                healthBarGui.Adornee = rootPart
+                healthBarGui.Size = UDim2.new(0, 10, 0, 45)
+                healthBarGui.StudsOffset = Vector3.new(-3, 0, 0)
+                healthBarGui.AlwaysOnTop = true
+                healthBarGui.Parent = entity
+
+                local barBackground = Instance.new("Frame")
+                barBackground.Size = UDim2.new(1, 0, 1, 0)
+                barBackground.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+                barBackground.BorderSizePixel = 1
+                barBackground.Parent = healthBarGui
+
+                local healthBar = Instance.new("Frame")
+                healthBar.Name = "HealthBarFill"
+                healthBar.Size = UDim2.new(1, 0, 1, 0)
+                healthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+                healthBar.BorderSizePixel = 0
+                healthBar.Parent = barBackground
+            end
+
+            -- Create BillboardGui for health and distance
+            if INFO_ENABLED then
+                local billboard = Instance.new("BillboardGui")
+                billboard.Name = "ESPInfo"
+                billboard.Adornee = rootPart
+                billboard.Size = UDim2.new(0, 100, 0, 50)
+                billboard.StudsOffset = Vector3.new(0, -7, 0)
+                billboard.AlwaysOnTop = true
+                billboard.Parent = entity
+
+                local healthLabel = Instance.new("TextLabel")
+                healthLabel.Name = "Health"
+                healthLabel.Size = UDim2.new(1, 0, 0.5, 0)
+                healthLabel.BackgroundTransparency = 1
+                healthLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                healthLabel.TextStrokeTransparency = 0
+                healthLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                healthLabel.TextSize = 14
+                healthLabel.Font = Enum.Font.SourceSansBold
+                healthLabel.Parent = billboard
+
+                local distanceLabel = Instance.new("TextLabel")
+                distanceLabel.Name = "Distance"
+                distanceLabel.Size = UDim2.new(1, 0, 0.5, 0)
+                distanceLabel.Position = UDim2.new(0, 0, 0.55, 0)
+                distanceLabel.BackgroundTransparency = 1
+                distanceLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+                distanceLabel.TextStrokeTransparency = 0
+                distanceLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                distanceLabel.TextSize = 14
+                distanceLabel.Font = Enum.Font.SourceSansBold
+                distanceLabel.Parent = billboard
+
+                -- Update health and distance
+                local connection
+                connection = RunService.RenderStepped:Connect(function()
+                    if not (entity and entity.Parent and humanoid and rootPart and LocalPlayer.Character and LocalPlayer.Character.Parent) then
+                        connection:Disconnect()
+                        return
+                    end
+
+                    if INFO_ENABLED then
+                        healthLabel.Text = string.format("Health: %d/%d", humanoid.Health, humanoid.MaxHealth)
+                    end
+
+                    if HEALTHBAR_ENABLED then
+                        local healthFraction = humanoid.Health / humanoid.MaxHealth
+                        local healthBar = entity:FindFirstChild("HealthBar") and entity.HealthBar:FindFirstChild("HealthBarFill")
+                        if healthBar then
+                            healthBar.Size = UDim2.new(1, 0, healthFraction, 0)
+                            healthBar.Position = UDim2.new(0, 0, 1 - healthFraction, 0)
+                        end
+                    end
+
+                    if INFO_ENABLED then
+                        local localRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        if localRoot then
+                            local distance = (rootPart.Position - localRoot.Position).Magnitude
+                            distanceLabel.Text = string.format("Distance: %.1f studs", distance)
+                        else
+                            distanceLabel.Text = "Distance: N/A"
+                        end
+                    end
+                end)
+            end
+        end
+    end
+end
+
+-- Function to remove ESP from an entity
+local function removeESP(entity)
+    if entity then
+        local highlight = entity:FindFirstChild("ESP")
+        local billboard = entity:FindFirstChild("ESPInfo")
+        local healthBarGui = entity:FindFirstChild("HealthBar")
+        if highlight then
+            highlight:Destroy()
+        end
+        if billboard then
+            billboard:Destroy()
+        end
+        if healthBarGui then
+            healthBarGui:Destroy()
+        end
+    end
+end
+
+-- Function to find and apply ESP to NPCs
+local function updateNPCs()
+    if not ESP_ENABLED then return end
+    for _, model in ipairs(Workspace:GetDescendants()) do
+        if model:IsA("Model") and model ~= LocalPlayer.Character then
+            local humanoid = model:FindFirstChildOfClass("Humanoid")
+            local rootPart = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Torso")
+            if humanoid and rootPart and not Players:GetPlayerFromCharacter(model) then
+                removeESP(model)
+                createESP(model)
+            end
+        end
+    end
+end
+
+-- Monitor workspace for new NPCs
+Workspace.DescendantAdded:Connect(function(descendant)
+    if ESP_ENABLED and descendant:IsA("Model") then
+        local humanoid = descendant:FindFirstChildOfClass("Humanoid")
+        local rootPart = descendant:FindFirstChild("HumanoidRootPart") or descendant:FindFirstChild("Torso")
+        if humanoid and rootPart and not Players:GetPlayerFromCharacter(descendant) then
+            wait(0.1)
+            createESP(descendant)
+        end
+    end
+end)
+
+-- Create GUI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ESPGui"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 200, 0, 200)
+Frame.Position = UDim2.new(0, 10, 0, 10)
+Frame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Frame.BorderSizePixel = 2
+Frame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(0.8, 0, 0, 30)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Title.Text = "ESP Control Panel"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 16
+Title.Font = Enum.Font.SourceSansBold
+Title.Parent = Frame
+
+-- Minimize/Maximize Button
+local MinimizeButton = Instance.new("TextButton")
+MinimizeButton.Size = UDim2.new(0.2, 0, 0, 30)
+MinimizeButton.Position = UDim2.new(0.8, 0, 0, 0)
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+MinimizeButton.Text = "-"
+MinimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeButton.TextSize = 16
+MinimizeButton.Parent = Frame
+
+-- Toggle ESP Button
+local ToggleESPButton = Instance.new("TextButton")
+ToggleESPButton.Size = UDim2.new(0.9, 0, 0, 30)
+ToggleESPButton.Position = UDim2.new(0.05, 0, 0, 40)
+ToggleESPButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+ToggleESPButton.Text = "ESP: ON"
+ToggleESPButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleESPButton.TextSize = 14
+ToggleESPButton.Parent = Frame
+
+-- Toggle Highlight Button
+local ToggleHighlightButton = Instance.new("TextButton")
+ToggleHighlightButton.Size = UDim2.new(0.9, 0, 0, 30)
+ToggleHighlightButton.Position = UDim2.new(0.05, 0, 0, 80)
+ToggleHighlightButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+ToggleHighlightButton.Text = "Highlight: ON"
+ToggleHighlightButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleHighlightButton.TextSize = 14
+ToggleHighlightButton.Parent = Frame
+
+-- Toggle Health Bar Button
+local ToggleHealthBarButton = Instance.new("TextButton")
+ToggleHealthBarButton.Size = UDim2.new(0.9, 0, 0, 30)
+ToggleHealthBarButton.Position = UDim2.new(0.05, 0, 0, 120)
+ToggleHealthBarButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+ToggleHealthBarButton.Text = "Health Bar: ON"
+ToggleHealthBarButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleHealthBarButton.TextSize = 14
+ToggleHealthBarButton.Parent = Frame
+
+-- Toggle Info Button
+local ToggleInfoButton = Instance.new("TextButton")
+ToggleInfoButton.Size = UDim2.new(0.9, 0, 0, 30)
+ToggleInfoButton.Position = UDim2.new(0.05, 0, 0, 160)
+ToggleInfoButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+ToggleInfoButton.Text = "Info Labels: ON"
+ToggleInfoButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleInfoButton.TextSize = 14
+ToggleInfoButton.Parent = Frame
+
+-- Dragging Functionality
+local isDragging = false
+local dragStart = nil
+local startPos = nil
+
+local function updateDrag(input)
+    if isDragging then
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end
+
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isDragging = true
+        dragStart = input.Position
+        startPos = Frame.Position
+    end
+end)
+
+Frame.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isDragging = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        updateDrag(input)
+    end
+end)
+
+-- Minimize/Maximize Functionality
+local isMinimized = false
+local function toggleMinimize()
+    isMinimized = not isMinimized
+    if isMinimized then
+        Frame.Size = UDim2.new(0, 200, 0, 30)
+        ToggleESPButton.Visible = false
+        ToggleHighlightButton.Visible = false
+        ToggleHealthBarButton.Visible = false
+        ToggleInfoButton.Visible = false
+        MinimizeButton.Text = "+"
+    else
+        Frame.Size = UDim2.new(0, 200, 0, 200)
+        ToggleESPButton.Visible = true
+        ToggleHighlightButton.Visible = true
+        ToggleHealthBarButton.Visible = true
+        ToggleInfoButton.Visible = true
+        MinimizeButton.Text = "-"
+    end
+end
+
+MinimizeButton.MouseButton1Click:Connect(toggleMinimize)
+
+-- Button Connections
+ToggleESPButton.MouseButton1Click:Connect(function()
+    ESP_ENABLED = not ESP_ENABLED
+    ToggleESPButton.Text = "ESP: " .. (ESP_ENABLED and "ON" or "OFF")
+    if not ESP_ENABLED then
+        for _, model in ipairs(Workspace:GetDescendants()) do
+            if model:IsA("Model") and model ~= LocalPlayer.Character then
+                removeESP(model)
+            end
+        end
+    else
+        updateNPCs()
+    end
+end)
+
+ToggleHighlightButton.MouseButton1Click:Connect(function()
+    HIGHLIGHT_ENABLED = not HIGHLIGHT_ENABLED
+    ToggleHighlightButton.Text = "Highlight: " .. (HIGHLIGHT_ENABLED and "ON" or "OFF")
+    updateNPCs()
+end)
+
+ToggleHealthBarButton.MouseButton1Click:Connect(function()
+    HEALTHBAR_ENABLED = not HEALTHBAR_ENABLED
+    ToggleHealthBarButton.Text = "Health Bar: " .. (HEALTHBAR_ENABLED and "ON" or "OFF")
+    updateNPCs()
+end)
+
+ToggleInfoButton.MouseButton1Click:Connect(function()
+    INFO_ENABLED = not INFO_ENABLED
+    ToggleInfoButton.Text = "Info Labels: " .. (INFO_ENABLED and "ON" or "OFF")
+    updateNPCs()
+end)
+
+-- Initial ESP setup for NPCs
+updateNPCs()
+
+-- Periodically update ESP for NPCs
+while true do
+    updateNPCs()
+    wait(1)
+end
