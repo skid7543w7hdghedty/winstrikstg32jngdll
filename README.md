@@ -1,1 +1,0 @@
-# winstrikstg32jngdll
